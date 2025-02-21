@@ -21,9 +21,11 @@ const RootLayout: React.FC<Props> = (props) => {
   const { children } = props;
   return (
     <html lang="ja">
-      <body>
+      <body className="overflow-hidden">
         <Header />
-        <Main>{children}</Main>
+        <div className="overflow-auto">
+          <Main>{children}</Main>
+        </div>
       </body>
     </html>
   );
