@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Line } from "@/app/_types/Line";
 import type { Station } from "@/app/_types/Station";
@@ -24,6 +24,7 @@ export default function Page() {
   const [newLineName, setNewLineName] = useState("");
   const [newLineColor, setNewLineColor] = useState("");
   const [newLineId, setNewLineId] = useState("");
+  const [stationIds, setStationIds] = useState<string[]>([]);
   const [isLineRing, setIsLineRing] = useState(false);
   const [isStationModalOpen, setIsStationModalOpen] = useState(false);
   const [newStationName, setNewStationName] = useState("");
@@ -64,7 +65,7 @@ export default function Page() {
         id: newLineId,
         name: newLineName,
         color: newLineColor,
-        station: [],
+        station: stationIds,
         ring: isLineRing,
       };
       if (lines.find((line) => line.id === newLine.id)) {
@@ -121,6 +122,7 @@ export default function Page() {
     setNewStationName("");
     setNewStationPos(["", ""]);
     setNewStationScale(0);
+    setStationIds([]);
     setErrorMessage(null);
   };
 
@@ -221,7 +223,7 @@ export default function Page() {
   ) => {
     e.preventDefault();
     const updatedLines = lines.map((line) => {
-      if (line.id === lineId) {
+      if (line.id === selectedLineId) {
         return {
           ...line,
           station: [...line.station, stationId],
@@ -230,7 +232,6 @@ export default function Page() {
       return line;
     });
     setLines(updatedLines);
-    setIsAddStation2LineModalOpen(false);
   };
 
   const deleteStation2Line = (
@@ -239,6 +240,7 @@ export default function Page() {
   ) => {
     e.preventDefault();
     const updatedLines = lines.map((line) => {
+      if (line.id !== selectedLineId) return line;
       return {
         ...line,
         station: line.station.filter((station) => station !== stationId),
@@ -273,6 +275,179 @@ export default function Page() {
     setLines(updatedLines);
   };
 
+  const MapCanvas = () => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const [lineValueX, setLineValueX] = useState<number>(0);
+    const [lineValueY, setLineValueY] = useState<number>(0);
+    const [canvasSize, setCanvasSize] = useState<{
+      width: number;
+      height: number;
+    }>({ width: 0, height: 0 });
+
+    const [centerX, setCenterX] = useState<number>(0);
+    const [centerY, setCenterY] = useState<number>(0);
+
+    useEffect(() => {
+      const updateSize = () => {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        if (width <= 640) setCanvasSize({ width: width - 128, height: height });
+        else if (width <= 768)
+          setCanvasSize({ width: width - 200, height: height });
+        else setCanvasSize({ width: width - 300, height: height });
+      };
+      updateSize();
+      window.addEventListener("resize", updateSize);
+      return () => window.removeEventListener("resize", updateSize);
+    }, []);
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const minX = Math.min(...stations.map((station) => station.pos[0]));
+      const maxX = Math.max(...stations.map((station) => station.pos[0]));
+      const minY = Math.min(...stations.map((station) => station.pos[1]));
+      const maxY = Math.max(...stations.map((station) => station.pos[1]));
+
+      let sumX = 0,
+        sumY = 0,
+        count = 0;
+
+      lines.forEach((line) => {
+        ctx.beginPath();
+        line.station.forEach((stationId: string, index: number) => {
+          const station = stations.find((station) => station.id === stationId);
+          if (!station) return;
+
+          const x = Number(station.pos[0]) + ((maxX - minX) * lineValueX) / 100;
+          const y = Number(station.pos[1]) + ((maxY - minY) * lineValueY) / 100;
+
+          sumX += x;
+          sumY += y;
+          count++;
+
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          if (index === line.station.length - 1 && line.ring) {
+            const firstStation = stations.find(
+              (station) => station.id === line.station[0]
+            );
+            if (!firstStation) return;
+            const firstX =
+              Number(firstStation.pos[0]) + ((maxX - minX) * lineValueX) / 100;
+            const firstY =
+              Number(firstStation.pos[1]) + ((maxY - minY) * lineValueY) / 100;
+            ctx.lineTo(firstX, firstY);
+          }
+        });
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = line.color;
+        ctx.stroke();
+        ctx.closePath();
+      });
+
+      stations.forEach((station) => {
+        ctx.beginPath();
+        const x = Number(station.pos[0]) + ((maxX - minX) * lineValueX) / 100;
+        const y = Number(station.pos[1]) + ((maxY - minY) * lineValueY) / 100;
+        const scale = (station.scale + 1) * 5;
+        ctx.arc(x, y, scale, 0, Math.PI * 2);
+        ctx.fillStyle = "white";
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+        ctx.closePath();
+      });
+
+      if (count > 0) {
+        setCenterX(Math.round(sumX / count));
+        setCenterY(Math.round(sumY / count));
+      }
+    }, [canvasSize, lineValueX, lineValueY]);
+
+    return (
+      <div
+        ref={containerRef}
+        className="h-full sm:w-[calc(100%-200px)] md:w-[calc(100%-200px)] lg:w-[calc(100%-300px)]"
+      >
+        <canvas
+          ref={canvasRef}
+          id="map"
+          width={canvasSize.width}
+          height={canvasSize.height}
+        />
+
+        <div className="absolute bottom-16 left-0">
+          <LineSliderY
+            lineValueY={lineValueY}
+            setLineValueY={setLineValueY}
+            centerY={centerY}
+          />
+        </div>
+
+        <div className="absolute bottom-0 left-16">
+          <LineSliderX
+            lineValueX={lineValueX}
+            setLineValueX={setLineValueX}
+            centerX={centerX}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const LineSliderX: React.FC<{
+    lineValueX: number;
+    setLineValueX: React.Dispatch<React.SetStateAction<number>>;
+    centerX: number;
+  }> = ({ lineValueX, setLineValueX, centerX }) => {
+    return (
+      <div className="flex flex-col items-center space-y-4">
+        <input
+          type="range"
+          min="-100"
+          max="100"
+          value={lineValueX}
+          onChange={(e) => setLineValueX(Number(e.target.value))}
+          className="w-64 appearance-none rounded-lg bg-gray-200"
+          style={{ direction: "rtl" }}
+        />
+        <span className="text-xl">X: {-lineValueX}%</span>
+      </div>
+    );
+  };
+
+  const LineSliderY: React.FC<{
+    lineValueY: number;
+    setLineValueY: React.Dispatch<React.SetStateAction<number>>;
+    centerY: number;
+  }> = ({ lineValueY, setLineValueY, centerY }) => {
+    return (
+      <div className="flex flex-row items-center space-x-4">
+        <span className="text-xl" style={{ writingMode: "vertical-rl" }}>
+          Y: {-lineValueY}%
+        </span>
+        <input
+          type="range"
+          min="-100"
+          max="100"
+          value={lineValueY}
+          onChange={(e) => setLineValueY(Number(e.target.value))}
+          className="h-64 appearance-none rounded-lg bg-gray-200"
+          style={{ writingMode: "vertical-lr", direction: "rtl" }}
+        />
+      </div>
+    );
+  };
+
   return (
     <main className="flex-1">
       <table className="min-w-full table-fixed border-collapse border-2 border-slate-800 bg-slate-200">
@@ -287,7 +462,7 @@ export default function Page() {
             </td>
             <td className="h-full border-2 border-slate-800 p-0">
               <button className="size-full px-4 py-1 hover:bg-slate-300 active:bg-slate-400">
-                背景画像のインポート
+                背景画像のインポート(未実装)
               </button>
             </td>
             <td className="h-full border-2 border-slate-800 p-0">
@@ -304,7 +479,9 @@ export default function Page() {
         </tbody>
       </table>
       <div className="flex h-full">
-        <div className="flex-1"></div>
+        <div className="h-full flex-1 flex-col">
+          <MapCanvas />
+        </div>
         <div
           className="flex h-screen w-[128px] flex-col border-x-2 border-slate-800 
                 bg-slate-100 sm:w-[200px] md:w-[300px]"
@@ -341,6 +518,7 @@ export default function Page() {
                         setNewLineName(line.name);
                         setNewLineColor(line.color);
                         setIsLineRing(line.ring);
+                        setStationIds(line.station);
                       }}
                     >
                       <FontAwesomeIcon icon={faGear} className="mr-1" />
@@ -583,6 +761,7 @@ export default function Page() {
         onClose={() => {
           setIsStationOfLineModalOpen(false);
           setIsLineRing(false);
+          setStationIds([]);
         }}
       >
         <div className="flex flex-col space-y-4">
@@ -668,6 +847,7 @@ export default function Page() {
               onClick={() => {
                 setIsStationOfLineModalOpen(false);
                 setIsLineRing(false);
+                setStationIds([]);
               }}
             >
               終了する
@@ -683,7 +863,10 @@ export default function Page() {
             {stations.map((station, index) => (
               <button
                 key={index}
-                className="w-auto max-w-max rounded-lg border-4 border-slate-400 px-4 py-1 hover:border-slate-500 active:border-slate-600"
+                disabled={lines
+                  .find((line) => line.id === selectedLineId)
+                  ?.station.includes(station.id)}
+                className="w-auto max-w-max rounded-lg border-4 border-slate-400 px-4 py-1 hover:border-slate-500 active:border-slate-600 disabled:border-slate-200"
                 onClick={(e) => addStation2Line(e, newLineId, station.id)}
               >
                 {station.name}
@@ -692,10 +875,10 @@ export default function Page() {
           </div>
           <div className="mr-3 flex justify-center">
             <button
-              className="mt-2 w-auto max-w-max rounded-md bg-red-500 px-4 py-1 font-bold text-white hover:bg-red-600 active:bg-red-700"
+              className="mt-2 w-auto max-w-max rounded-md bg-indigo-500 px-4 py-1 font-bold text-white hover:bg-indigo-600 active:bg-indigo-700"
               onClick={() => setIsAddStation2LineModalOpen(false)}
             >
-              キャンセル
+              終了する
             </button>
           </div>
         </Modal>
