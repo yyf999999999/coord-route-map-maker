@@ -6,6 +6,7 @@ import type { Station } from "@/app/_types/Station";
 import { Modal } from "@/app/_components/Modal";
 import { v4 as uuid } from "uuid";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   faArrowDown,
   faArrowUp,
@@ -38,8 +39,11 @@ export default function Page() {
   const [selectedLineId, setSelectedLineId] = useState("");
   const [isAddStation2LineModalOpen, setIsAddStation2LineModalOpen] =
     useState(false);
+  const [isSave2AccountModalOpen, setIsSave2AccountModalOpen] = useState(false);
   const radioButtons = ["小", "中", "大"];
-
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileNameOfAccount, setFileNameOfAccount] = useState("");
   const lineInitialization = () => {
     setIsLineModalOpen(false);
     setNewLineName("");
@@ -47,6 +51,28 @@ export default function Page() {
     setIsLineRing(false);
     setErrorMessage(null);
   };
+
+  useEffect(() => {
+    const storedData = sessionStorage.getItem("routeMapData");
+    if (storedData) {
+      try {
+        const mapData = JSON.parse(storedData);
+        if (mapData?.line && mapData?.station) {
+          mapData.station.forEach((station: Station) => {
+            station.scale = Math.round(station.scale);
+          });
+          console.log(mapData.line);
+          console.log(mapData.station);
+          setLines(mapData.line);
+          setStations(mapData.station);
+        } else {
+          console.warn("lines または stations が undefined です");
+        }
+      } catch (error) {
+        console.error("データのパースに失敗しました:", error);
+      }
+    }
+  }, []);
 
   const addLines = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -448,6 +474,50 @@ export default function Page() {
     );
   };
 
+  const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault(); // ページリロードを防ぐ
+
+    setIsSubmitting(true);
+
+    try {
+      const requestBody = {
+        id: uuid(),
+        title: fileNameOfAccount,
+        station: stations,
+        line: lines,
+        createdAt: new Date(),
+      };
+      const requestUrl = "/api/new";
+
+      console.log(`${requestUrl} => ${JSON.stringify(requestBody, null, 2)}`);
+
+      const res = await fetch(requestUrl, {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json", // JSONとして送信
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!res.ok) {
+        throw new Error(`${res.status}: ${res.statusText}`); // -> catchへ
+      }
+
+      const postResponse = await res.json();
+      setIsSubmitting(false);
+      router.push(`/make`);
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error
+          ? `投稿記事のPOSTリクエストに失敗しました\n${error.message}`
+          : `予期せぬエラーが発生しました\n${error}`;
+      console.error(errorMsg);
+      window.alert(errorMsg);
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <main className="flex-1">
       <table className="min-w-full table-fixed border-collapse border-2 border-slate-800 bg-slate-200">
@@ -467,11 +537,16 @@ export default function Page() {
             </td>
             <td className="h-full border-2 border-slate-800 p-0">
               <button className="size-full px-4 py-1 hover:bg-slate-300 active:bg-slate-400">
-                ローカルに保存
+                ローカルに保存(未実装)
               </button>
             </td>
             <td className="h-full border-2 border-slate-800 p-0">
-              <button className="size-full px-4 py-1 hover:bg-slate-300 active:bg-slate-400">
+              <button
+                className="size-full px-4 py-1 hover:bg-slate-300 active:bg-slate-400"
+                onClick={() => {
+                  setIsSave2AccountModalOpen(true);
+                }}
+              >
                 アカウントに保存
               </button>
             </td>
@@ -882,6 +957,46 @@ export default function Page() {
             </button>
           </div>
         </Modal>
+      </Modal>
+      <Modal
+        isOpen={isSave2AccountModalOpen}
+        onClose={() => setIsSave2AccountModalOpen(false)}
+      >
+        <div className="space-y-2">
+          <label htmlFor="fileName" className="block font-bold">
+            保存するファイル名
+          </label>
+          <input
+            type="text"
+            id="fileNameAccount"
+            name="fileNameAccount"
+            className="w-full rounded-md border-2 px-2 py-1"
+            value={fileNameOfAccount}
+            onChange={(e) => setFileNameOfAccount(e.target.value)}
+            placeholder="ファイル名を記入してください"
+          ></input>
+          <div className="flex justify-between">
+            <button
+              className="w-auto max-w-max rounded-md bg-red-500 px-4 py-1 font-bold text-white hover:bg-red-600 active:bg-red-700"
+              onClick={(e) => {
+                setIsSave2AccountModalOpen(false);
+              }}
+            >
+              キャンセル
+            </button>
+            <button
+              className={
+                "w-auto max-w-max rounded-md bg-indigo-500 px-4 py-1 font-bold text-white hover:bg-indigo-600 active:bg-indigo-700"
+              }
+              onClick={(e) => {
+                setIsSave2AccountModalOpen(false);
+                handleSubmit(e);
+              }}
+            >
+              保存
+            </button>
+          </div>
+        </div>
       </Modal>
     </main>
   );

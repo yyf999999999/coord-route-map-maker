@@ -13,14 +13,15 @@ export default function Page() {
       <div className="flex justify-center">
         <div className="mb-5 w-2/3 rounded-md border-2 border-slate-500 bg-slate-200 px-4 py-1">
           <div className="">
-            CoordRouteMapMakerは、自由度をできる限り高くすることを理念に開発された路線図エディターです。
+            CoordRouteMapMakerは、座標を入力することで駅や路線を描画していく路線図エディターです。
           </div>
+          {/*
           <div className="text-right">
             <button className="rounded-md bg-green-500 px-2 py-1 text-white hover:bg-green-600 active:bg-green-700">
               <FontAwesomeIcon icon={faCircleQuestion} className="mr-1" />
               使い方
             </button>
-          </div>
+          </div>*/}
         </div>
       </div>
 
@@ -42,7 +43,7 @@ export default function Page() {
           <div>他の人が作った路線図を閲覧します</div>
           <Link href="/">
             <button className="rounded-md bg-indigo-500 px-8 py-1 text-white hover:bg-indigo-600 active:bg-indigo-700">
-              始める
+              始める(未実装)
             </button>
           </Link>
         </div>

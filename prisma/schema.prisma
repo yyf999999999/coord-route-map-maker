@@ -1,0 +1,39 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model RouteMap {
+  id        String   @id @default(uuid())
+  title     String
+  station   Station[]  
+  line      Line[]     
+  createdAt DateTime @default(now()) 
+}
+
+model Station {
+  id        String   @id @default(uuid())
+  name      String
+  pos       Decimal[]  // `[number, number]` を `Decimal[]` に変更
+  scale     Decimal    // `number` を `Decimal` に変更
+  routeMap  RouteMap @relation(fields: [routeMapId], references: [id])
+  routeMapId String
+}
+
+model Line {
+  id        String   @id @default(uuid())
+  name      String
+  color     String
+  station   String[]  // `string[]` を `String[]` に変更
+  ring      Boolean   // `boolean` を `Boolean` に変更
+  routeMap  RouteMap @relation(fields: [routeMapId], references: [id])
+  routeMapId String
+}
