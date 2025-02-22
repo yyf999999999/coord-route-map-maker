@@ -475,7 +475,7 @@ export default function Page() {
   };
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault(); // ページリロードを防ぐ
+    e.preventDefault();
 
     setIsSubmitting(true);
 
