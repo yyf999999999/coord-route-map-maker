@@ -8,7 +8,7 @@ type RequestBody = {
   title: string;
   station: Station[];
   line: Line[];
-  createdAt: string; // Date → string に修正
+  createdAt: string;
 };
 
 export async function POST(req: Request) {
@@ -17,14 +17,14 @@ export async function POST(req: Request) {
     try {
       body = await req.json();
     } catch (error) {
-      console.error("❌ JSON パースエラー:", error);
+      console.error("JSON パースエラー:", error);
       return NextResponse.json(
         { message: "Invalid JSON body", error: String(error) },
         { status: 400 }
       );
     }
 
-    console.log("📥 受け取ったデータ:", JSON.stringify(body, null, 2));
+    console.log("受け取ったデータ:", JSON.stringify(body, null, 2));
 
     const newRouteMap = await prisma.routeMap.create({
       data: {
@@ -55,13 +55,10 @@ export async function POST(req: Request) {
       },
     });
 
-    console.log(
-      "✅ 成功: RouteMap 作成:",
-      JSON.stringify(newRouteMap, null, 2)
-    );
+    console.log("成功: RouteMap 作成:", JSON.stringify(newRouteMap, null, 2));
     return NextResponse.json(newRouteMap, { status: 201 });
   } catch (error) {
-    console.error("🔥 データベースエラー:", error);
+    console.error("データベースエラー:", error);
     return NextResponse.json(
       { message: "Failed to create RouteMap", error: String(error) },
       { status: 500 }

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Line } from "@/app/_types/Line";
 import type { Station } from "@/app/_types/Station";
+import type { RouteMap } from "@/app/_types/RouteMap";
 import { Modal } from "@/app/_components/Modal";
 import { v4 as uuid } from "uuid";
 import Link from "next/link";
@@ -42,7 +43,6 @@ export default function Page() {
   const [isSave2AccountModalOpen, setIsSave2AccountModalOpen] = useState(false);
   const radioButtons = ["小", "中", "大"];
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileNameOfAccount, setFileNameOfAccount] = useState("");
   const lineInitialization = () => {
     setIsLineModalOpen(false);
@@ -477,8 +477,6 @@ export default function Page() {
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
 
-    setIsSubmitting(true);
-
     try {
       const requestBody = {
         id: uuid(),
@@ -488,8 +486,6 @@ export default function Page() {
         createdAt: new Date(),
       };
       const requestUrl = "/api/new";
-
-      console.log(`${requestUrl} => ${JSON.stringify(requestBody, null, 2)}`);
 
       const res = await fetch(requestUrl, {
         method: "POST",
@@ -505,7 +501,6 @@ export default function Page() {
       }
 
       const postResponse = await res.json();
-      setIsSubmitting(false);
       router.push(`/make`);
     } catch (error) {
       const errorMsg =
@@ -514,8 +509,31 @@ export default function Page() {
           : `予期せぬエラーが発生しました\n${error}`;
       console.error(errorMsg);
       window.alert(errorMsg);
-      setIsSubmitting(false);
     }
+  };
+
+  const save2Local = () => {
+    const data: RouteMap = {
+      id: uuid(),
+      title: "local",
+      station: stations,
+      line: lines,
+      createdAt: new Date(),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "newRouteMap.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    router.push(`/make`);
   };
 
   return (
@@ -536,8 +554,13 @@ export default function Page() {
               </button>
             </td>
             <td className="h-full border-2 border-slate-800 p-0">
-              <button className="size-full px-4 py-1 hover:bg-slate-300 active:bg-slate-400">
-                ローカルに保存(未実装)
+              <button
+                className="size-full px-4 py-1 hover:bg-slate-300 active:bg-slate-400"
+                onClick={() => {
+                  save2Local();
+                }}
+              >
+                ローカルに保存
               </button>
             </td>
             <td className="h-full border-2 border-slate-800 p-0">
