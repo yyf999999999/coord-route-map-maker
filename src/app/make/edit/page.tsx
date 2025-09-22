@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Ref } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { Line } from "@/app/_types/Line";
 import type { Station } from "@/app/_types/Station";
@@ -305,15 +305,23 @@ export default function Page() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const [lineValueX, setLineValueX] = useState<number>(0);
-    const [lineValueY, setLineValueY] = useState<number>(0);
+    // const [lineValueX, setLineValueX] = useState<number>(0);
+    // const [lineValueY, setLineValueY] = useState<number>(0);
+    const [entireX, setEntireX] = useState<number>(0);
+    const [entireY, setEntireY] = useState<number>(0);
     const [canvasSize, setCanvasSize] = useState<{
       width: number;
       height: number;
     }>({ width: 0, height: 0 });
 
-    const [centerX, setCenterX] = useState<number>(0);
-    const [centerY, setCenterY] = useState<number>(0);
+    // const [centerX, setCenterX] = useState<number>(0);
+    // const [centerY, setCenterY] = useState<number>(0);
+
+    const [mouseDown, setMouseDown] = useState<boolean>(false);
+    const [mousePos, setMousePos] = useState<{ x: number; y: number }>({
+      x: 0,
+      y: 0,
+    });
 
     useEffect(() => {
       const updateSize = () => {
@@ -332,15 +340,71 @@ export default function Page() {
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+
+      const moveLine = (pos: { x: number; y: number }) => {
+        const deltaX = pos.x - mousePos.x;
+        const deltaY = pos.y - mousePos.y;
+
+        setMousePos(pos);
+
+        const minX = -Math.max(...stations.map((station) => station.pos[0]));
+        const maxX =
+          canvas.width - Math.min(...stations.map((station) => station.pos[0]));
+        const minY = -Math.max(...stations.map((station) => station.pos[1]));
+        const maxY =
+          canvas.height -
+          Math.min(...stations.map((station) => station.pos[1]));
+        console.log(minX, maxX, minY, maxY);
+
+        let x = entireX + deltaX;
+        let y = entireY + deltaY;
+
+        if (x < minX) x = minX;
+        if (x > maxX) x = maxX;
+        if (y < minY) y = minY;
+        if (y > maxY) y = maxY;
+
+        setEntireX(x);
+        setEntireY(y);
+      };
+
+      const handleMouseDown = (e: MouseEvent) => {
+        setMouseDown(true);
+        setMousePos({ x: e.clientX, y: e.clientY });
+      };
+      const handleMouseMove = (e: MouseEvent) => {
+        if (mouseDown) {
+          moveLine({ x: e.clientX, y: e.clientY });
+          console.log(mousePos);
+        }
+      };
+      const handleMouseUp = () => {
+        setMouseDown(false);
+      };
+
+      canvas.addEventListener("mousedown", handleMouseDown);
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+
+      return () => {
+        canvas.removeEventListener("mousedown", handleMouseDown);
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
+      };
+    }, [mouseDown, mousePos, entireX, entireY]);
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const minX = Math.min(...stations.map((station) => station.pos[0]));
+      /*const minX = Math.min(...stations.map((station) => station.pos[0]));
       const maxX = Math.max(...stations.map((station) => station.pos[0]));
       const minY = Math.min(...stations.map((station) => station.pos[1]));
-      const maxY = Math.max(...stations.map((station) => station.pos[1]));
+      const maxY = Math.max(...stations.map((station) => station.pos[1]));*/
 
       let sumX = 0,
         sumY = 0,
@@ -352,8 +416,10 @@ export default function Page() {
           const station = stations.find((station) => station.id === stationId);
           if (!station) return;
 
-          const x = Number(station.pos[0]) + ((maxX - minX) * lineValueX) / 100;
-          const y = Number(station.pos[1]) + ((maxY - minY) * lineValueY) / 100;
+          // const x = Number(station.pos[0]) + ((maxX - minX) * lineValueX) / 100;
+          // const y = Number(station.pos[1]) + ((maxY - minY) * lineValueY) / 100;
+          const x = Number(station.pos[0]) + entireX;
+          const y = Number(station.pos[1]) + entireY;
 
           sumX += x;
           sumY += y;
@@ -366,10 +432,8 @@ export default function Page() {
               (station) => station.id === line.station[0]
             );
             if (!firstStation) return;
-            const firstX =
-              Number(firstStation.pos[0]) + ((maxX - minX) * lineValueX) / 100;
-            const firstY =
-              Number(firstStation.pos[1]) + ((maxY - minY) * lineValueY) / 100;
+            const firstX = Number(firstStation.pos[0]) + entireX;
+            const firstY = Number(firstStation.pos[1]) + entireY;
             ctx.lineTo(firstX, firstY);
           }
         });
@@ -381,8 +445,8 @@ export default function Page() {
 
       stations.forEach((station) => {
         ctx.beginPath();
-        const x = Number(station.pos[0]) + ((maxX - minX) * lineValueX) / 100;
-        const y = Number(station.pos[1]) + ((maxY - minY) * lineValueY) / 100;
+        const x = Number(station.pos[0]) + entireX;
+        const y = Number(station.pos[1]) + entireY;
         const scale = (station.scale + 1) * 5;
         ctx.arc(x, y, scale, 0, Math.PI * 2);
         ctx.fillStyle = "white";
@@ -394,10 +458,10 @@ export default function Page() {
       });
 
       if (count > 0) {
-        setCenterX(Math.round(sumX / count));
-        setCenterY(Math.round(sumY / count));
+        // setCenterX(Math.round(sumX / count));
+        // setCenterY(Math.round(sumY / count));
       }
-    }, [canvasSize, lineValueX, lineValueY]);
+    }, [canvasSize, entireX, entireY]);
 
     return (
       <div
@@ -411,7 +475,7 @@ export default function Page() {
           height={canvasSize.height}
         />
 
-        <div className="absolute bottom-16 left-0">
+        {/*<div className="absolute bottom-16 left-0">
           <LineSliderY
             lineValueY={lineValueY}
             setLineValueY={setLineValueY}
@@ -425,12 +489,12 @@ export default function Page() {
             setLineValueX={setLineValueX}
             centerX={centerX}
           />
-        </div>
+        </div>*/}
       </div>
     );
   };
 
-  const LineSliderX: React.FC<{
+  /*const LineSliderX: React.FC<{
     lineValueX: number;
     setLineValueX: React.Dispatch<React.SetStateAction<number>>;
     centerX: number;
@@ -472,7 +536,23 @@ export default function Page() {
         />
       </div>
     );
-  };
+  };*/
+
+  /*canvas.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    mousePosX = e.clientX;
+    mousePosY = e.clientY;
+  });
+
+  document.addEventListener("mousemove", (e) => {
+      if (isDragging){
+          moveImage(e.clientX, e.clientY);
+      }
+  });
+
+  document.addEventListener("mouseup", (e) => {
+      isDragging = false;
+  });*/
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
